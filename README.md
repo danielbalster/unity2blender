@@ -11,6 +11,6 @@ export your unity 4 project as blender python script. this allows you to debug y
 ## notes
 - all images are packed into the blend after the script completes. you should now save the blend to its final location and unpack all files into that folder
 - material handling is more or less not existing; was not yet important for me
-- 
+
 
 have fun!
