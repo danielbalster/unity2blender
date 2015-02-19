@@ -1,6 +1,6 @@
 /*
  * Unity plugin to export to Blender/Beerengine
- * 
+ *
  * Place in "Editor" folder and choose "File / Export to Blender"
  *
  * Copyright (C) Daniel Balster
@@ -49,11 +49,11 @@ public static class Extensions
 public class BlenderExporter
 {
 	TextWriter script;
-
+	
 	public BlenderExporter ()
 	{
 	}
-
+	
 	void Recurse (Transform trfm, Action<Transform> action)
 	{
 		action (trfm);
@@ -77,7 +77,7 @@ public class BlenderExporter
 		
 		if (go.type == LightType.Area)
 			return false;
-
+		
 		if (go.type == LightType.Point) {
 			WriteLine ("l=bpy.data.lamps.new(name='{0}',type='POINT')", id);
 		} else if (go.type == LightType.Spot) {
@@ -86,7 +86,7 @@ public class BlenderExporter
 		if (go.type == LightType.Directional) {
 			WriteLine ("l=bpy.data.lamps.new(name='{0}',type='HEMI')", id);
 		}
-
+		
 		WriteLine ("l.energy={0}", go.intensity);
 		WriteLine ("l.distance={0}", go.range);
 		//WriteLine ("l.clip_end=4");
@@ -94,16 +94,16 @@ public class BlenderExporter
 		if (go.type == LightType.Spot) {
 			WriteLine ("l.spot_size={0}", go.spotAngle * 3.141596 / 180);
 		}
-
+		
 		return true;
 	}
-
+	
 	HashSet<string> meshes = new HashSet<string> ();
-
+	
 	public void ExportMesh (Mesh amesh, Mesh mesh, Material mat)
 	{
 		int csum = 0;
-
+		
 		// expensive and lame
 		if (mesh.vertexCount > 0) {
 			for (int i = 0, n = mesh.vertexCount; i < n; ++i) {
@@ -119,7 +119,7 @@ public class BlenderExporter
 				}
 			}
 		}
-
+		
 		var id = mesh.name + "#" + csum;
 		if (meshes.Contains (id)) {
 			WriteLine ("me=Me['{0}']", id);
@@ -169,7 +169,7 @@ public class BlenderExporter
 			WriteLine ("\tfor l in range(p.loop_start,p.loop_start+p.loop_total):");
 			WriteLine ("\t\tuvl[l].uv=uv1[me.loops[l].vertex_index]");
 		}
-/*		if (mesh.uv2 != null && mesh.uv2.Length > 0) {
+		/*		if (mesh.uv2 != null && mesh.uv2.Length > 0) {
 				WriteLine ("uvt=me.uv_textures.new(name='UVMap')");
 				WriteLine ("uvl=me.uv_layers[1].data");
 				WriteLine ("for p in me.polygons:");
@@ -177,37 +177,37 @@ public class BlenderExporter
 				WriteLine ("\t\tuvl[l].uv=uv2[me.loops[l].vertex_index]");
 			}
 */
-
+		
 	}
-
+	
 	HashSet<string> images = new HashSet<string> ();
 	HashSet<string> textures = new HashSet<string> ();
-
+	
 	public bool ExportTexture (Texture tex)
 	{
 		if (tex == null)
 			return false;
-
+		
 		var id = tex.ID ();
-
+		
 		if (textures.Contains (id)) {
 			WriteLine ("t=T['{0}']", id);
 			return true;
 		}
 		textures.Add (id);
-
+		
 		WriteLine ("t=T.new('{0}',type='IMAGE')", id);
-
+		
 		var path = UnityEditor.AssetDatabase.GetAssetOrScenePath (tex);
 		if (path.Length != 0) {
 			path = System.IO.Path.GetFullPath (path);
-
+			
 			if (!images.Contains (path)) {
 				images.Add (path);
-
+				
 				//var basename = System.IO.Path.GetFileNameWithoutExtension (path);
 				//var filename = System.IO.Path.GetFileName (path);
-
+				
 				WriteLine ("i=I.load('{0}')", path);
 				WriteLine ("i.pack(as_png=True)");
 				WriteLine ("i.filepath=os.path.splitext(i.filepath)[0]+'.png'");
@@ -216,12 +216,12 @@ public class BlenderExporter
 			}
 			WriteLine ("t.image=i");
 		}
-
+		
 		return true;
 	}
 	
 	HashSet<string> materials = new HashSet<string> ();
-
+	
 	void ExportMaterial (Material mat)
 	{
 		if (materials.Contains (mat.ID ())) {
@@ -230,12 +230,12 @@ public class BlenderExporter
 		}
 		materials.Add (mat.ID ());
 		WriteLine ("ma=Ma.new('{0}')", mat.ID ());
-
+		
 		WriteLine ("ma.diffuse_color={0},{1},{2}", mat.color.r, mat.color.g, mat.color.b);
-
-		bool additive = mat.shader.name.ToLower().Contains ("Additive");
+		
+		bool additive = mat.shader.name.ToLower().Contains ("additive");
 		bool cutout = mat.shader.name.ToLower().Contains ("cutout");
-
+		
 		if (cutout) {
 			WriteLine ("ma.use_transparency=True");
 			WriteLine ("ma.game_settings.alpha_blend='CLIP'");
@@ -243,8 +243,13 @@ public class BlenderExporter
 		if (additive) {
 			WriteLine ("ma.use_transparency=True");
 			WriteLine ("ma.game_settings.alpha_blend='ADD'");
+			WriteLine("ma.beerengine_cull_enable=False");
+			WriteLine("ma.beerengine_blend_func_src='GL_ONE'");
+			WriteLine("ma.beerengine_blend_func_dst='GL_ONE'");
+			WriteLine("ma.beerengine_blend_func_src_a='GL_ONE'");
+			WriteLine("ma.beerengine_blend_func_dst_a='GL_ONE'");
 		}
-
+		
 		if (ExportTexture (mat.GetTexture ("_MainTex"))) {
 			WriteLine ("ts=ma.texture_slots.add() # maintex");
 			WriteLine ("ts.texture=t");
@@ -252,7 +257,7 @@ public class BlenderExporter
 			WriteLine ("ts.uv_layer='UVMap'");
 			WriteLine ("ts.use_map_color_diffuse=True");
 		}
-
+		
 		if (ExportTexture (mat.GetTexture ("_BumpMap"))) {
 			WriteLine ("ts=ma.texture_slots.add() # bumpmap");
 			WriteLine ("ts.texture=t");
@@ -261,12 +266,12 @@ public class BlenderExporter
 			WriteLine ("ts.use_map_color_diffuse=False");
 			WriteLine ("ts.use_map_normal=True");
 		}
-
+		
 		//	if (ExportTexture (mat.GetTexture ("_Cube"))) {
 		//		WriteLine("ts=ma.texture_slots.add() # cubemap");
 		//		WriteLine("ts.texture=t");
 		//	}
-
+		
 		/*
 		if (ExportTexture (mat.GetTexture ("_LightmapTex"))) {
 			WriteLine("ts=ma.texture_slots.add() # lightmap");
@@ -277,7 +282,7 @@ public class BlenderExporter
 		}
 */
 	}
-
+	
 	public void Export ()
 	{
 		script = File.CreateText ("export.py");
@@ -292,33 +297,40 @@ public class BlenderExporter
 		WriteLine ("T=D.textures");
 		WriteLine ("I=D.images");
 		WriteLine ("Q='QUATERNION'");
-
-		var blacklisted_parents = new HashSet<Transform> ();
-
+		
+		var meshedobjects = new HashSet<string> ();
+		
 		Recurse ((trfm) => {
-
-			if (trfm.parent != null && blacklisted_parents.Contains (trfm.parent))
-				return;
-
+			
+			//if (trfm.parent != null)
+			//	return;
+			
 			var name = "None";
-
+			
 			var mf = trfm.GetComponent<MeshFilter> ();
-			if (mf != null && mf.sharedMesh != null) {
+			if (mf != null && mf.sharedMesh != null && trfm.light == null) {
 				Material mat = null;
 				if (trfm.renderer != null) {
 					mat = trfm.renderer.sharedMaterial;
 				}
-
+				
 				ExportMesh (mf.mesh,mf.sharedMesh, mat);
 				name = "me";
+				meshedobjects.Add (trfm.ID());
 			}
-
+			
 			if (trfm.light != null) {
 				ExportLight (trfm.light);
 				name = "l";
 			}
-
+			
 			WriteLine ("o=O.new('{0}',{1})", trfm.ID (), name);
+			
+			if (name=="None")
+			{
+				WriteLine ("o.empty_draw_type='SINGLE_ARROW'");
+			}
+			
 			//WriteLine("o.show_name = True");
 			if (trfm.parent != null) {
 				if (trfm.light != null) {
@@ -326,50 +338,51 @@ public class BlenderExporter
 					var m = Matrix4x4.TRS (trfm.localPosition, trfm.localRotation, trfm.localScale);
 					m = m * Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (-180, 0, 0), Vector3.one);
 					WriteLine ("o.matrix_local=(({0},{1},{2},{3}),({4},{5},{6},{7}),({8},{9},{10},{11}),({12},{13},{14},{15}))",
-					          m [0], m [1], m [2], m [3],
-					          m [4], m [5], m [6], m [7],
-					          m [8], m [9], m [10], m [11],
-					          m [12], m [13], m [14], m [15]
-					);
+					           m [0], m [1], m [2], m [3],
+					           m [4], m [5], m [6], m [7],
+					           m [8], m [9], m [10], m [11],
+					           m [12], m [13], m [14], m [15]
+					           );
 				} else {
 					WriteLine ("o.location=({0},{1},{2})", trfm.localPosition.x, trfm.localPosition.y, trfm.localPosition.z);
 					WriteLine ("o.scale=({0},{1},{2})", trfm.localScale.x, trfm.localScale.y, trfm.localScale.z);
 					WriteLine ("o.rotation_mode=Q");
 					WriteLine ("o.rotation_quaternion=[{0},{1},{2},{3}]", trfm.localRotation.w, trfm.localRotation.x, trfm.localRotation.y, trfm.localRotation.z);
 				}
-				WriteLine ("o.parent=O['{0}']", trfm.parent.ID ());
+				WriteLine ("if O['{0}'] is not None:", trfm.parent.ID ());
+				WriteLine ("\to.parent=O['{0}']", trfm.parent.ID ());
 			} else {
 				// rotate root nodes 90° on x-axis (unity -> blender coordinate system)
 				var m = Matrix4x4.TRS (trfm.localPosition, trfm.localRotation, trfm.localScale);
 				m = Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (90, 0, 0), Vector3.one) * m;
 				WriteLine ("o.matrix_local=(({0},{1},{2},{3}),({4},{5},{6},{7}),({8},{9},{10},{11}),({12},{13},{14},{15}))",
-				          m [0], m [1], m [2], m [3],
-				          m [4], m [5], m [6], m [7],
-				          m [8], m [9], m [10], m [11],
-				          m [12], m [13], m [14], m [15]
-				);
+				           m [0], m [1], m [2], m [3],
+				           m [4], m [5], m [6], m [7],
+				           m [8], m [9], m [10], m [11],
+				           m [12], m [13], m [14], m [15]
+				           );
 			}
 			WriteLine ("S.link(o)");
-					
-			if (mf != null && mf.sharedMesh != null) {
+			
+			if (mf != null && mf.sharedMesh != null && trfm.light == null) {
 				if (trfm.renderer != null) {
 					var material = trfm.renderer.sharedMaterial;
-
+					
 					//if (trfm.lightmapIndex!=255)
 					//{
 					//	//var to = trfm.renderer.lightmapTilingOffset
 					//}
-
+					
 					ExportMaterial (material);
 					WriteLine ("if len(o.material_slots)<1:");
 					WriteLine ("\to.data.materials.append(ma)");
-
+					
 					if (material.mainTexture != null && mf.sharedMesh.uv.Length > 0) {
 						WriteLine ("i=ma.texture_slots[0].texture.image");
 						WriteLine ("for f in me.uv_textures[0].data:");
 						WriteLine ("\tf.image=i");
 					}
-
+					
 					//WriteLine ("uvt = bpy.data.meshes['{0}'].uv_textures.new(name='UV')",id);
 					//WriteLine ("\tuv_texture.name = 'UV'");
 					//WriteLine("\tif bpy.data.meshes.get('{0}') is not None and len(bpy.data.meshes['{0}'].uv_textures)>0:",mf.ID(),mf.ID());
@@ -377,24 +390,25 @@ public class BlenderExporter
 					//WriteLine("\t\t\tf.image = image");
 				}
 			}
-
+			
 			if (trfm.audio != null) {
 				WriteLine ("# audio");
 			}
-
+			
 			if (trfm.collider != null) {
 				WriteLine ("# collider");
 			}
-
+			
 			if (trfm.collider2D != null) {
 				WriteLine ("# collider2D");
 			}
-
+			
 			if (trfm.particleEmitter != null) {
-#if PART
 				var e = trfm.particleEmitter;
 				WriteLine("o.beerengine_asset_type='8'");
 				WriteLine("o.beerengine_emitter_one_shot=False");
+				WriteLine("o.beerengine_emitter_texture='sprites/Steam_A.png'");
+				WriteLine("o.beerengine_emitter_particlesystem='ps'");
 				WriteLine("o.beerengine_emitter_ipolmode='0'");
 				WriteLine("o.beerengine_emitter_animated=False");
 				WriteLine("o.beerengine_emitter_usenormal=True");
@@ -403,7 +417,7 @@ public class BlenderExporter
 				WriteLine("o.beerengine_emitter_cols=1");
 				WriteLine("o.beerengine_emitter_velocity=[{0},{1},{2}]",e.localVelocity.x,e.localVelocity.y,e.localVelocity.z);
 				//WriteLine("o.beerengine_emitter_force=[0,0,0]");
-				WriteLine("o.beerengine_emitter_count={0}",e.particleCount);
+				WriteLine("o.beerengine_emitter_count={0}",100);//e.particleCount);
 				/*
 				WriteLine("o.beerengine_emitter_framerate=15");
 				WriteLine("o.beerengine_emitter_duration=1");
@@ -427,30 +441,36 @@ public class BlenderExporter
 				WriteLine("o.beerengine_emitter_emission_max={0}",e.maxEmission);
 				//WriteLine("o.beerengine_emitter_velocity_min=[{0},{2},{3}]",e.localVelocity.X,e.localVelocity.Y,e.localVelocity.Z);
 				//WriteLine("o.beerengine_emitter_velocity_max=[{0},{2},{3}]",e.localVelocity.X,e.localVelocity.Y,e.localVelocity.Z);
-#endif
 			}
 			
 			
-
+			
 		});
-
-		foreach (var m in meshes) {
-			WriteLine ("me=Me['{0}']", m);
-			WriteLine ("me.remDoubles(0.01)");
-			WriteLine ("me.smooth()");
-			WriteLine ("me.update()");
+		
+		/*
+		var i = 0;
+		foreach (var m in meshedobjects) {
+			WriteLine ("bpy.ops.object.select_pattern(pattern='{0}')",m);
+			WriteLine ("bpy.context.scene.objects.active=bpy.context.scene.objects['{0}']",m);
+			WriteLine ("bpy.ops.object.editmode_toggle()");
+			WriteLine ("bpy.ops.mesh.select_all(action='SELECT')");
+			WriteLine ("bpy.ops.mesh.remove_doubles()");
+			WriteLine ("bpy.ops.mesh.faces_shade_smooth()");
+			WriteLine ("bpy.ops.object.editmode_toggle()");
+			WriteLine ("print('{0} / {1} {2}')",i,meshedobjects.Count,m);
 		}
-	
-
-
+		*/
+		
+		
+		
 		script.Close ();
 	}
-
+	
 	void Write (string format, params object[] arg)
 	{
 		script.Write (format, arg);
 	}
-
+	
 	void WriteLine (string format, params object[] arg)
 	{
 		script.WriteLine (format, arg);
