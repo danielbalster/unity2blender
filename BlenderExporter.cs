@@ -82,8 +82,7 @@ public class BlenderExporter
 			WriteLine ("l=bpy.data.lamps.new(name='{0}',type='POINT')", id);
 		} else if (go.type == LightType.Spot) {
 			WriteLine ("l=bpy.data.lamps.new(name='{0}',type='SPOT')", id);
-		}
-		if (go.type == LightType.Directional) {
+		} else if (go.type == LightType.Directional) {
 			WriteLine ("l=bpy.data.lamps.new(name='{0}',type='HEMI')", id);
 		}
 		
@@ -111,11 +110,10 @@ public class BlenderExporter
 				var x = BitConverter.GetBytes (v.x);
 				var y = BitConverter.GetBytes (v.y);
 				var z = BitConverter.GetBytes (v.z);
-				for (int j=0; j<4; ++j)
-				{
-					csum = unchecked(csum + x[j]);
-					csum = unchecked(csum + y[j]);
-					csum = unchecked(csum + z[j]);
+				for (int j=0; j<4; ++j) {
+					csum = unchecked(csum + x [j]);
+					csum = unchecked(csum + y [j]);
+					csum = unchecked(csum + z [j]);
 				}
 			}
 		}
@@ -133,7 +131,8 @@ public class BlenderExporter
 		if (mesh.vertexCount > 0) {
 			for (int i = 0, n = mesh.vertexCount; i < n; ++i) {
 				var v = mesh.vertices [i];
-				verts.AppendFormat ("({0},{1},{2}),", v.x, v.y, v.z);
+				// inverted
+				verts.AppendFormat ("({0},{1},{2}),", -v.x, -v.y, -v.z);
 			}
 		}
 		if (mesh.uv.Length > 0) {
@@ -159,7 +158,8 @@ public class BlenderExporter
 		*/
 		int[] tris = mesh.triangles;
 		for (int i = 0, n = tris.Length; i < n; i+=3) {
-			faces.AppendFormat ("({0},{1},{2}),", tris [i], tris [i + 1], tris [i + 2]);
+			// normal flipped
+			faces.AppendFormat ("({0},{1},{2}),", tris [i + 2], tris [i + 1], tris [i + 0]);
 		}
 		WriteLine ("me.from_pydata([{0}],[],[{1}])", verts.ToString (), faces.ToString ());
 		if (mesh.uv != null && mesh.uv.Length > 0) {
@@ -233,8 +233,8 @@ public class BlenderExporter
 		
 		WriteLine ("ma.diffuse_color={0},{1},{2}", mat.color.r, mat.color.g, mat.color.b);
 		
-		bool additive = mat.shader.name.ToLower().Contains ("additive");
-		bool cutout = mat.shader.name.ToLower().Contains ("cutout");
+		bool additive = mat.shader.name.ToLower ().Contains ("additive");
+		bool cutout = mat.shader.name.ToLower ().Contains ("cutout");
 		
 		if (cutout) {
 			WriteLine ("ma.use_transparency=True");
@@ -243,11 +243,13 @@ public class BlenderExporter
 		if (additive) {
 			WriteLine ("ma.use_transparency=True");
 			WriteLine ("ma.game_settings.alpha_blend='ADD'");
-			WriteLine("ma.beerengine_cull_enable=False");
-			WriteLine("ma.beerengine_blend_func_src='GL_ONE'");
-			WriteLine("ma.beerengine_blend_func_dst='GL_ONE'");
-			WriteLine("ma.beerengine_blend_func_src_a='GL_ONE'");
-			WriteLine("ma.beerengine_blend_func_dst_a='GL_ONE'");
+//#if BEERENGINE
+			WriteLine ("ma.beerengine_cull_enable=False");
+			WriteLine ("ma.beerengine_blend_func_src='GL_ONE'");
+			WriteLine ("ma.beerengine_blend_func_dst='GL_ONE'");
+			WriteLine ("ma.beerengine_blend_func_src_a='GL_ONE'");
+			WriteLine ("ma.beerengine_blend_func_dst_a='GL_ONE'");
+//#endif
 		}
 		
 		if (ExportTexture (mat.GetTexture ("_MainTex"))) {
@@ -314,9 +316,9 @@ public class BlenderExporter
 					mat = trfm.renderer.sharedMaterial;
 				}
 				
-				ExportMesh (mf.mesh,mf.sharedMesh, mat);
+				ExportMesh (mf.mesh, mf.sharedMesh, mat);
 				name = "me";
-				meshedobjects.Add (trfm.ID());
+				meshedobjects.Add (trfm.ID ());
 			}
 			
 			if (trfm.light != null) {
@@ -326,41 +328,30 @@ public class BlenderExporter
 			
 			WriteLine ("o=O.new('{0}',{1})", trfm.ID (), name);
 			
-			if (name=="None")
-			{
+			if (name == "None") {
 				WriteLine ("o.empty_draw_type='SINGLE_ARROW'");
 			}
 			
 			//WriteLine("o.show_name = True");
 			if (trfm.parent != null) {
-				if (trfm.light != null) {
-					// flip lights around x-axis
-					var m = Matrix4x4.TRS (trfm.localPosition, trfm.localRotation, trfm.localScale);
-					m = m * Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (-180, 0, 0), Vector3.one);
-					WriteLine ("o.matrix_local=(({0},{1},{2},{3}),({4},{5},{6},{7}),({8},{9},{10},{11}),({12},{13},{14},{15}))",
-					           m [0], m [1], m [2], m [3],
-					           m [4], m [5], m [6], m [7],
-					           m [8], m [9], m [10], m [11],
-					           m [12], m [13], m [14], m [15]
-					           );
-				} else {
-					WriteLine ("o.location=({0},{1},{2})", trfm.localPosition.x, trfm.localPosition.y, trfm.localPosition.z);
-					WriteLine ("o.scale=({0},{1},{2})", trfm.localScale.x, trfm.localScale.y, trfm.localScale.z);
-					WriteLine ("o.rotation_mode=Q");
-					WriteLine ("o.rotation_quaternion=[{0},{1},{2},{3}]", trfm.localRotation.w, trfm.localRotation.x, trfm.localRotation.y, trfm.localRotation.z);
-				}
+				// invert coordinate system
+				WriteLine ("o.location=({0},{1},{2})", -trfm.localPosition.x, -trfm.localPosition.y, -trfm.localPosition.z);
+				WriteLine ("o.scale=({0},{1},{2})", trfm.localScale.x, trfm.localScale.y, trfm.localScale.z);
+				WriteLine ("o.rotation_mode=Q");
+				WriteLine ("o.rotation_quaternion=[{0},{1},{2},{3}]", trfm.localRotation.w, trfm.localRotation.x, trfm.localRotation.y, trfm.localRotation.z);
 				WriteLine ("if O['{0}'] is not None:", trfm.parent.ID ());
 				WriteLine ("\to.parent=O['{0}']", trfm.parent.ID ());
 			} else {
-				// rotate root nodes 90° on x-axis (unity -> blender coordinate system)
+				// rotate root nodes 90° ccw on x-axis (unity -> blender coordinate system)
 				var m = Matrix4x4.TRS (trfm.localPosition, trfm.localRotation, trfm.localScale);
-				m = Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (90, 0, 0), Vector3.one) * m;
+				var flip_x = new Vector3 (1, 1, 1);
+				m = Matrix4x4.TRS (Vector3.zero, Quaternion.Euler (-90, 0, 0), flip_x) * m;
 				WriteLine ("o.matrix_local=(({0},{1},{2},{3}),({4},{5},{6},{7}),({8},{9},{10},{11}),({12},{13},{14},{15}))",
 				           m [0], m [1], m [2], m [3],
 				           m [4], m [5], m [6], m [7],
 				           m [8], m [9], m [10], m [11],
 				           m [12], m [13], m [14], m [15]
-				           );
+				);
 			}
 			WriteLine ("S.link(o)");
 			
@@ -405,19 +396,22 @@ public class BlenderExporter
 			
 			if (trfm.particleEmitter != null) {
 				var e = trfm.particleEmitter;
-				WriteLine("o.beerengine_asset_type='8'");
-				WriteLine("o.beerengine_emitter_one_shot=False");
-				WriteLine("o.beerengine_emitter_texture='sprites/Steam_A.png'");
-				WriteLine("o.beerengine_emitter_particlesystem='ps'");
-				WriteLine("o.beerengine_emitter_ipolmode='0'");
-				WriteLine("o.beerengine_emitter_animated=False");
-				WriteLine("o.beerengine_emitter_usenormal=True");
-				WriteLine("o.beerengine_emitter_alphafade=True");
-				WriteLine("o.beerengine_emitter_rows=1");
-				WriteLine("o.beerengine_emitter_cols=1");
-				WriteLine("o.beerengine_emitter_velocity=[{0},{1},{2}]",e.localVelocity.x,e.localVelocity.y,e.localVelocity.z);
-				//WriteLine("o.beerengine_emitter_force=[0,0,0]");
-				WriteLine("o.beerengine_emitter_count={0}",100);//e.particleCount);
+//#if BEERENGINE
+				WriteLine ("o.beerengine_asset_type='8'");
+				WriteLine ("o.beerengine_emitter_one_shot=False");
+				WriteLine ("o.beerengine_emitter_texture='sprites/Steam_A.png'");
+				WriteLine ("o.beerengine_emitter_particlesystem='ps'");
+				WriteLine ("o.beerengine_emitter_ipolmode='0'");
+				WriteLine ("o.beerengine_emitter_animated=False");
+				WriteLine ("o.beerengine_emitter_usenormal=True");
+				WriteLine ("o.beerengine_emitter_alphafade=True");
+				WriteLine ("o.beerengine_emitter_rows=1");
+				WriteLine ("o.beerengine_emitter_cols=1");
+				WriteLine ("o.beerengine_emitter_velocity=[{0},{1},{2}]", e.localVelocity.x, e.localVelocity.y, e.localVelocity.z);
+				WriteLine("o.beerengine_emitter_force=[1,0,0]");
+				//WriteLine("o.beerengine_emitter_velocity_min=1");
+				//WriteLine("o.beerengine_emitter_velocity_max=1");
+				WriteLine ("o.beerengine_emitter_count={0}", 100);//e.particleCount);
 				/*
 				WriteLine("o.beerengine_emitter_framerate=15");
 				WriteLine("o.beerengine_emitter_duration=1");
@@ -435,19 +429,32 @@ public class BlenderExporter
 				WriteLine("o.beerengine_emitter_rot_min=0");
 				WriteLine("o.beerengine_emitter_rot_max=0");
 				*/
-				WriteLine("o.beerengine_emitter_energy_min={0}",e.minEnergy);
-				WriteLine("o.beerengine_emitter_energy_max={0}",e.maxEnergy);
-				WriteLine("o.beerengine_emitter_emission_min={0}",e.minEmission);
-				WriteLine("o.beerengine_emitter_emission_max={0}",e.maxEmission);
+				WriteLine ("o.beerengine_emitter_energy_min={0}", e.minEnergy);
+				WriteLine ("o.beerengine_emitter_energy_max={0}", e.maxEnergy);
+				WriteLine ("o.beerengine_emitter_emission_min={0}", e.minEmission);
+				WriteLine ("o.beerengine_emitter_emission_max={0}", e.maxEmission);
 				//WriteLine("o.beerengine_emitter_velocity_min=[{0},{2},{3}]",e.localVelocity.X,e.localVelocity.Y,e.localVelocity.Z);
 				//WriteLine("o.beerengine_emitter_velocity_max=[{0},{2},{3}]",e.localVelocity.X,e.localVelocity.Y,e.localVelocity.Z);
+//#endif
 			}
 			
 			
 			
 		});
 		
+//#if BEERENGINE
+		// add default particle system
+		WriteLine ("o=O.new('ps',None)");
+		WriteLine ("o.empty_draw_type='SINGLE_ARROW'");
+		WriteLine ("o.beerengine_asset_type='9'");
+		WriteLine ("o.beerengine_psys_count=65536");
+		WriteLine ("o.beerengine_psys_vs_shader='shaders/vs/particles.glsl'");
+		WriteLine ("o.beerengine_psys_fs_shader='shaders/fs/particles.glsl'");
+		WriteLine ("S.link(o)");
+//#endif		
 		/*
+		 * this is really expensive
+
 		var i = 0;
 		foreach (var m in meshedobjects) {
 			WriteLine ("bpy.ops.object.select_pattern(pattern='{0}')",m);
