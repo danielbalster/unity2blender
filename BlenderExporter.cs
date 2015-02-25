@@ -399,36 +399,43 @@ public class BlenderExporter
 //#if BEERENGINE
 				WriteLine ("o.beerengine_asset_type='8'");
 				WriteLine ("o.beerengine_emitter_one_shot=False");
-				WriteLine ("o.beerengine_emitter_texture='sprites/Steam_A.png'");
+
+
+				var path = UnityEditor.AssetDatabase.GetAssetOrScenePath (e.renderer.sharedMaterial.mainTexture);
+
+				WriteLine ("o.beerengine_emitter_texture='{0}'",path);
 				WriteLine ("o.beerengine_emitter_particlesystem='ps'");
 				WriteLine ("o.beerengine_emitter_ipolmode='0'");
 				WriteLine ("o.beerengine_emitter_animated=False");
-				WriteLine ("o.beerengine_emitter_usenormal=True");
+				WriteLine ("o.beerengine_emitter_usenormal=False");
 				WriteLine ("o.beerengine_emitter_alphafade=True");
 				WriteLine ("o.beerengine_emitter_rows=1");
 				WriteLine ("o.beerengine_emitter_cols=1");
-				WriteLine ("o.beerengine_emitter_velocity=[{0},{1},{2}]", e.localVelocity.x, e.localVelocity.y, e.localVelocity.z);
-				WriteLine("o.beerengine_emitter_force=[1,0,0]");
-				//WriteLine("o.beerengine_emitter_velocity_min=1");
-				//WriteLine("o.beerengine_emitter_velocity_max=1");
-				WriteLine ("o.beerengine_emitter_count={0}", 100);//e.particleCount);
+				//WriteLine ("o.beerengine_emitter_ipolmode=0");
+				WriteLine ("o.beerengine_emitter_velocity=[{0},{1},{2}]", -e.localVelocity.x, -e.localVelocity.y,-e.localVelocity.z);
+				WriteLine ("o.beerengine_emitter_force=[{0},{1},{2}]", -e.localVelocity.x, -e.localVelocity.y,-e.localVelocity.z);
+				//WriteLine("o.beerengine_emitter_force=[0,4,0]");
+				WriteLine("o.beerengine_emitter_velocity_min=1");
+				WriteLine("o.beerengine_emitter_velocity_max=1");
+				WriteLine ("o.beerengine_emitter_count={0}", 30);//e.particleCount);
 				/*
 				WriteLine("o.beerengine_emitter_framerate=15");
 				WriteLine("o.beerengine_emitter_duration=1");
 				WriteLine("o.beerengine_emitter_delay=0");
-				WriteLine("o.beerengine_emitter_alpha_fade_in=0");
-				WriteLine("o.beerengine_emitter_alpha_fade_out=0");
-				WriteLine("o.beerengine_emitter_alpha_value=0");
-				WriteLine("o.beerengine_emitter_damping=0");
+				*/
+				WriteLine("o.beerengine_emitter_alpha_fade_in=0.1");
+				WriteLine("o.beerengine_emitter_alpha_fade_out=1");
+				WriteLine("o.beerengine_emitter_alpha_value=0.5");
+				WriteLine("o.beerengine_emitter_damping=0.7");
 				WriteLine("o.beerengine_emitter_alpha_begin=0");
 				WriteLine("o.beerengine_emitter_alpha_end=0");
-				WriteLine("o.beerengine_emitter_size_min=0");
-				WriteLine("o.beerengine_emitter_size_max=0");
-				WriteLine("o.beerengine_emitter_size_inc=0");
-				WriteLine("o.beerengine_emitter_rot_inc=0");
+				WriteLine("o.beerengine_emitter_size_min=1");
+				WriteLine("o.beerengine_emitter_size_max=1");
+				WriteLine("o.beerengine_emitter_size_inc=1");
+				WriteLine("o.beerengine_emitter_rot_inc=1");
 				WriteLine("o.beerengine_emitter_rot_min=0");
-				WriteLine("o.beerengine_emitter_rot_max=0");
-				*/
+				WriteLine("o.beerengine_emitter_rot_max=360");
+
 				WriteLine ("o.beerengine_emitter_energy_min={0}", e.minEnergy);
 				WriteLine ("o.beerengine_emitter_energy_max={0}", e.maxEnergy);
 				WriteLine ("o.beerengine_emitter_emission_min={0}", e.minEmission);
