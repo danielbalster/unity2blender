@@ -28,7 +28,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 using UnityEngine;
 using UnityEditor;
 using System;
@@ -42,7 +41,29 @@ public static class Extensions
 {
 	public static string ID (this UnityEngine.Object self)
 	{
-		return self.name + "#" + self.GetInstanceID ();
+		return self.name.Replace ("Instance","") + "#" + self.GetInstanceID ();
+	}
+}
+
+namespace BeerEngine
+{
+	public enum SgAssetType
+	{
+		IMAGE=0,
+		MATERIAL=1,
+		LIGHT=2,
+		GEOMETRY=3,
+		CONTROLLER=4,
+		CAMERA=5,
+		NAVMESH=6,
+		SKELETON=7,
+		EMITTER=8,
+		PARTICLESYSTEM=9,
+		AUDIOSOURCE=10,
+		FORCEFIELD=11,
+		TRIGGERVOLUME=12,
+		SKYBOX=13,
+		MAX
 	}
 }
 
@@ -99,7 +120,7 @@ public class BlenderExporter
 	
 	HashSet<string> meshes = new HashSet<string> ();
 	
-	public void ExportMesh (Mesh amesh, Mesh mesh, Material mat)
+	public void ExportMesh (Mesh amesh, Mesh mesh, Material mat, Renderer renderer)
 	{
 		int csum = 0;
 		
@@ -118,7 +139,7 @@ public class BlenderExporter
 			}
 		}
 		
-		var id = mesh.name + "#" + csum;
+		var id = mesh.name.Replace ("Instance","") + "#" + csum;
 		if (meshes.Contains (id)) {
 			WriteLine ("me=Me['{0}']", id);
 			return;
@@ -143,19 +164,17 @@ public class BlenderExporter
 			}
 			WriteLine ("]");
 		}
-		/*
-		bool nmap = mat.GetTexture ("_BumpMap") != null;
-		if (nmap) {
-			if (mesh.uv2.Length > 0) {
-				Write ("uv2=[");
-				for (int i = 0, n = mesh.uv2.Length; i < n; ++i) {
-					var uv = mesh.uv2 [i];
-					Write ("({0},{1}),", uv.x, uv.y);
-				}
-				WriteLine ("]");
+		if (mesh.uv2.Length > 0) {
+			Write ("uv2=[");
+			//var lm = renderer.lightmapTilingOffset;
+			//Debug.Log (string.Format ("i={0} xyzw={1}",renderer.lightmapIndex,renderer.lightmapTilingOffset));
+			for (int i = 0, n = mesh.uv2.Length; i < n; ++i) {
+				var uv = mesh.uv2 [i];
+				Write ("({0},{1}),", uv.x, uv.y);
+//				Write ("({0},{1}),", (uv.x*lm.x)+lm.z, (uv.y*lm.y)+lm.w);
 			}
+			WriteLine ("]");
 		}
-		*/
 		int[] tris = mesh.triangles;
 		for (int i = 0, n = tris.Length; i < n; i+=3) {
 			// normal flipped
@@ -169,17 +188,64 @@ public class BlenderExporter
 			WriteLine ("\tfor l in range(p.loop_start,p.loop_start+p.loop_total):");
 			WriteLine ("\t\tuvl[l].uv=uv1[me.loops[l].vertex_index]");
 		}
-		/*		if (mesh.uv2 != null && mesh.uv2.Length > 0) {
-				WriteLine ("uvt=me.uv_textures.new(name='UVMap')");
-				WriteLine ("uvl=me.uv_layers[1].data");
-				WriteLine ("for p in me.polygons:");
-				WriteLine ("\tfor l in range(p.loop_start,p.loop_start+p.loop_total):");
-				WriteLine ("\t\tuvl[l].uv=uv2[me.loops[l].vertex_index]");
-			}
-*/
-		
+		if (mesh.uv2 != null && mesh.uv2.Length > 0) {
+			WriteLine ("uvt=me.uv_textures.new(name='LightMap')");
+			WriteLine ("uvl=me.uv_layers[1].data");
+			WriteLine ("for p in me.polygons:");
+			WriteLine ("\tfor l in range(p.loop_start,p.loop_start+p.loop_total):");
+			WriteLine ("\t\tuvl[l].uv=uv2[me.loops[l].vertex_index]");
+		}
+
 	}
-	
+
+	int uniqueId = 0;
+
+	public void CreateTriggerVolume (Vector3 o, Vector3 _s)
+	{
+		var id = "tv" + uniqueId;
+		uniqueId++;
+		WriteLine ("me=Me.new('{0}')", id);
+		var verts = new StringBuilder ();
+		var faces = new StringBuilder ();
+
+
+		var s = new Vector3 (_s.x * 0.5f, _s.y * 0.5f, _s.z * 0.5f);
+
+		verts.AppendFormat ("({0},{1},{2}),", o.x - s.x, o.y - s.y, o.z + s.z);
+		verts.AppendFormat ("({0},{1},{2}),", o.x - s.x, o.y + s.y, o.z + s.z);
+		verts.AppendFormat ("({0},{1},{2}),", o.x + s.x, o.y + s.y, o.z + s.z);
+		verts.AppendFormat ("({0},{1},{2}),", o.x + s.x, o.y - s.y, o.z + s.z);
+		verts.AppendFormat ("({0},{1},{2}),", o.x - s.x, o.y - s.y, o.z - s.z);
+		verts.AppendFormat ("({0},{1},{2}),", o.x - s.x, o.y + s.y, o.z - s.z);
+		verts.AppendFormat ("({0},{1},{2}),", o.x + s.x, o.y + s.y, o.z - s.z);
+		verts.AppendFormat ("({0},{1},{2}),", o.x + s.x, o.y - s.y, o.z - s.z);
+/*
+		verts.AppendFormat ("({0},{1},{2}),", -s.x, -s.y, +s.z);
+		verts.AppendFormat ("({0},{1},{2}),", -s.x, +s.y, +s.z);
+		verts.AppendFormat ("({0},{1},{2}),", +s.x, +s.y, +s.z);
+		verts.AppendFormat ("({0},{1},{2}),", +s.x, -s.y, +s.z);
+		verts.AppendFormat ("({0},{1},{2}),", -s.x, -s.y, -s.z);
+		verts.AppendFormat ("({0},{1},{2}),", -s.x, +s.y, -s.z);
+		verts.AppendFormat ("({0},{1},{2}),", +s.x, +s.y, -s.z);
+		verts.AppendFormat ("({0},{1},{2}),", +s.x, -s.y, -s.z);
+*/
+		faces.AppendFormat ("({2},{1},{0}),", 0, 1, 2); // front
+		faces.AppendFormat ("({2},{1},{0}),", 2, 3, 0);
+		faces.AppendFormat ("({2},{1},{0}),", 1, 5, 6); // top
+		faces.AppendFormat ("({2},{1},{0}),", 6, 2, 1);
+		faces.AppendFormat ("({2},{1},{0}),", 5, 4, 7); // back
+		faces.AppendFormat ("({2},{1},{0}),", 7, 6, 5);
+		faces.AppendFormat ("({2},{1},{0}),", 4, 0, 3); // bottom
+		faces.AppendFormat ("({2},{1},{0}),", 3, 7, 4);
+		faces.AppendFormat ("({2},{1},{0}),", 3, 2, 6); // right
+		faces.AppendFormat ("({2},{1},{0}),", 6, 7, 3);
+		faces.AppendFormat ("({2},{1},{0}),", 0, 5, 1); // left
+		faces.AppendFormat ("({2},{1},{0}),", 0, 4, 5);
+
+
+		WriteLine ("me.from_pydata([{0}],[],[{1}])", verts.ToString (), faces.ToString ());
+	}
+
 	HashSet<string> images = new HashSet<string> ();
 	HashSet<string> textures = new HashSet<string> ();
 	
@@ -222,8 +288,13 @@ public class BlenderExporter
 	
 	HashSet<string> materials = new HashSet<string> ();
 	
-	void ExportMaterial (Material mat)
+	void ExportMaterial (Material mat, Renderer renderer)
 	{
+		if (renderer.lightmapIndex < 254) {
+			WriteLine ("o.beerengine_lightmap_index={0}", renderer.lightmapIndex);
+			WriteLine ("o.beerengine_lightmap_address=[{0},{1},{2},{3}]", renderer.lightmapTilingOffset.x, renderer.lightmapTilingOffset.y, renderer.lightmapTilingOffset.z, renderer.lightmapTilingOffset.w);
+		}
+		
 		if (materials.Contains (mat.ID ())) {
 			WriteLine ("ma=Ma['{0}']", mat.ID ());
 			return;
@@ -273,18 +344,21 @@ public class BlenderExporter
 		//		WriteLine("ts=ma.texture_slots.add() # cubemap");
 		//		WriteLine("ts.texture=t");
 		//	}
-		
-		/*
-		if (ExportTexture (mat.GetTexture ("_LightmapTex"))) {
-			WriteLine("ts=ma.texture_slots.add() # lightmap");
-			WriteLine("ts.texture=t");
-			WriteLine("ts.texture_coords='UV'");
-			WriteLine("ts.uv_layer='LM'");
-			WriteLine("ts.use_map_color_diffuse=True");
+
+
+		if (renderer.lightmapIndex>-1 && renderer.lightmapIndex<LightmapSettings.lightmaps.Length) {
+			if (ExportTexture( LightmapSettings.lightmaps[renderer.lightmapIndex].lightmapFar ))
+			{
+				WriteLine("tslm=ma.texture_slots.add() # lightmap");
+				WriteLine("tslm.texture=t");
+				WriteLine("tslm.texture_coords='UV'");
+				WriteLine("tslm.uv_layer='LightMap'");
+				WriteLine("tslm.use_map_color_diffuse=True");
+			}
 		}
-*/
+
 	}
-	
+
 	public void Export ()
 	{
 		script = File.CreateText ("export.py");
@@ -299,40 +373,84 @@ public class BlenderExporter
 		WriteLine ("T=D.textures");
 		WriteLine ("I=D.images");
 		WriteLine ("Q='QUATERNION'");
-		
+
+		foreach (var v in Enum.GetValues(typeof(BeerEngine.SgAssetType))) {
+			WriteLine ("BE_{0}='{1}'", v,(int)v);
+		}
+
 		var meshedobjects = new HashSet<string> ();
 		
 		Recurse ((trfm) => {
-			
-			//if (trfm.parent != null)
-			//	return;
-			
+
+			// blender is "one component per transform node"
+
+			var type = BeerEngine.SgAssetType.MAX;
+
 			var name = "None";
-			
+
+			if (trfm.light != null)
+				type = BeerEngine.SgAssetType.LIGHT;
+			if (trfm.particleEmitter != null)
+				type = BeerEngine.SgAssetType.EMITTER;
+			if (trfm.camera != null)
+				type = BeerEngine.SgAssetType.CAMERA;
+
 			var mf = trfm.GetComponent<MeshFilter> ();
-			if (mf != null && mf.sharedMesh != null && trfm.light == null) {
-				Material mat = null;
-				if (trfm.renderer != null) {
-					mat = trfm.renderer.sharedMaterial;
-				}
+
+			if (type == BeerEngine.SgAssetType.MAX) {
+				if (mf != null && mf.sharedMesh != null) {
+					Material mat = null;
+					if (trfm.renderer != null) {
+						mat = trfm.renderer.sharedMaterial;
+					}
 				
-				ExportMesh (mf.mesh, mf.sharedMesh, mat);
-				name = "me";
-				meshedobjects.Add (trfm.ID ());
+
+
+					ExportMesh (mf.mesh, mf.sharedMesh, mat, trfm.renderer);
+					type = BeerEngine.SgAssetType.GEOMETRY;
+					name = "me";
+					meshedobjects.Add (trfm.ID ());
+				}
 			}
 			
-			if (trfm.light != null) {
+			if (type == BeerEngine.SgAssetType.MAX) {
+				if (trfm.collider != null
+					&& trfm.audio == null
+					&& trfm.collider is BoxCollider
+				    ) {
+					type = BeerEngine.SgAssetType.TRIGGERVOLUME;
+				}
+			}
+
+			if (type == BeerEngine.SgAssetType.LIGHT) {
 				ExportLight (trfm.light);
 				name = "l";
 			}
+
+			if (type == BeerEngine.SgAssetType.TRIGGERVOLUME) {
+				//WriteLine ("# collider");
+				//CreateTriggerVolume (trfm.collider.bounds.center, trfm.collider.bounds.extents);
+				//name = "me";
+				//WriteLine ("o.empty_draw_type='CUBE'");
+				//WriteLine ("o.empty_draw_size={0}",trfm.collider.bounds.extents.z);
+			}
 			
+
+
 			WriteLine ("o=O.new('{0}',{1})", trfm.ID (), name);
 			
 			if (name == "None") {
 				WriteLine ("o.empty_draw_type='SINGLE_ARROW'");
 			}
-			
-			//WriteLine("o.show_name = True");
+
+			if (type == BeerEngine.SgAssetType.TRIGGERVOLUME) {
+				WriteLine ("o.beerengine_asset_type=BE_TRIGGERVOLUME");
+				WriteLine ("o.beerengine_triggervolume_center=[{0},{1},{2}]", trfm.collider.bounds.center.x, trfm.collider.bounds.center.y, trfm.collider.bounds.center.z);
+				WriteLine ("o.beerengine_triggervolume_extents=[{0},{1},{2}]", trfm.collider.bounds.extents.x, trfm.collider.bounds.extents.y, trfm.collider.bounds.extents.z);
+				WriteLine ("o.show_name = True");
+				WriteLine ("o.draw_type = 'BOUNDS'");
+			}
+
 			if (trfm.parent != null) {
 				// invert coordinate system
 				WriteLine ("o.location=({0},{1},{2})", -trfm.localPosition.x, -trfm.localPosition.y, -trfm.localPosition.z);
@@ -355,7 +473,7 @@ public class BlenderExporter
 			}
 			WriteLine ("S.link(o)");
 			
-			if (mf != null && mf.sharedMesh != null && trfm.light == null) {
+			if (type == BeerEngine.SgAssetType.GEOMETRY) {
 				if (trfm.renderer != null) {
 					var material = trfm.renderer.sharedMaterial;
 					
@@ -364,7 +482,7 @@ public class BlenderExporter
 					//	//var to = trfm.renderer.lightmapTilingOffset
 					//}
 					
-					ExportMaterial (material);
+					ExportMaterial (material, trfm.renderer);
 					WriteLine ("if len(o.material_slots)<1:");
 					WriteLine ("\to.data.materials.append(ma)");
 					
@@ -373,7 +491,12 @@ public class BlenderExporter
 						WriteLine ("for f in me.uv_textures[0].data:");
 						WriteLine ("\tf.image=i");
 					}
-					
+					if (trfm.renderer.lightmapIndex>-1 && trfm.renderer.lightmapIndex<LightmapSettings.lightmaps.Length) {
+						WriteLine ("i=tslm.texture.image");
+						WriteLine ("for f in me.uv_textures[len(me.uv_textures)-1].data:");
+						WriteLine ("\tf.image=i");
+					}
+
 					//WriteLine ("uvt = bpy.data.meshes['{0}'].uv_textures.new(name='UV')",id);
 					//WriteLine ("\tuv_texture.name = 'UV'");
 					//WriteLine("\tif bpy.data.meshes.get('{0}') is not None and len(bpy.data.meshes['{0}'].uv_textures)>0:",mf.ID(),mf.ID());
@@ -381,29 +504,21 @@ public class BlenderExporter
 					//WriteLine("\t\t\tf.image = image");
 				}
 			}
-			
-			if (trfm.audio != null) {
+
+			if (type == BeerEngine.SgAssetType.AUDIOSOURCE) {
 				WriteLine ("# audio");
 			}
 			
-			if (trfm.collider != null) {
-				WriteLine ("# collider");
-			}
-			
-			if (trfm.collider2D != null) {
-				WriteLine ("# collider2D");
-			}
-			
-			if (trfm.particleEmitter != null) {
+			if (type == BeerEngine.SgAssetType.EMITTER) {
 				var e = trfm.particleEmitter;
 //#if BEERENGINE
-				WriteLine ("o.beerengine_asset_type='8'");
+				WriteLine ("o.beerengine_asset_type=BE_EMITTER");
 				WriteLine ("o.beerengine_emitter_one_shot=False");
 
 
 				var path = UnityEditor.AssetDatabase.GetAssetOrScenePath (e.renderer.sharedMaterial.mainTexture);
 
-				WriteLine ("o.beerengine_emitter_texture='{0}'",path);
+				WriteLine ("o.beerengine_emitter_texture='{0}'", path);
 				WriteLine ("o.beerengine_emitter_particlesystem='ps'");
 				WriteLine ("o.beerengine_emitter_ipolmode='0'");
 				WriteLine ("o.beerengine_emitter_animated=False");
@@ -412,29 +527,29 @@ public class BlenderExporter
 				WriteLine ("o.beerengine_emitter_rows=1");
 				WriteLine ("o.beerengine_emitter_cols=1");
 				//WriteLine ("o.beerengine_emitter_ipolmode=0");
-				WriteLine ("o.beerengine_emitter_velocity=[{0},{1},{2}]", -e.localVelocity.x, -e.localVelocity.y,-e.localVelocity.z);
-				WriteLine ("o.beerengine_emitter_force=[{0},{1},{2}]", -e.localVelocity.x, -e.localVelocity.y,-e.localVelocity.z);
+				WriteLine ("o.beerengine_emitter_velocity=[{0},{1},{2}]", -e.localVelocity.x, -e.localVelocity.y, -e.localVelocity.z);
+				WriteLine ("o.beerengine_emitter_force=[{0},{1},{2}]", -e.localVelocity.x, -e.localVelocity.y, -e.localVelocity.z);
 				//WriteLine("o.beerengine_emitter_force=[0,4,0]");
-				WriteLine("o.beerengine_emitter_velocity_min=1");
-				WriteLine("o.beerengine_emitter_velocity_max=1");
+				WriteLine ("o.beerengine_emitter_velocity_min=1");
+				WriteLine ("o.beerengine_emitter_velocity_max=1");
 				WriteLine ("o.beerengine_emitter_count={0}", 30);//e.particleCount);
 				/*
 				WriteLine("o.beerengine_emitter_framerate=15");
 				WriteLine("o.beerengine_emitter_duration=1");
 				WriteLine("o.beerengine_emitter_delay=0");
 				*/
-				WriteLine("o.beerengine_emitter_alpha_fade_in=0.1");
-				WriteLine("o.beerengine_emitter_alpha_fade_out=1");
-				WriteLine("o.beerengine_emitter_alpha_value=0.5");
-				WriteLine("o.beerengine_emitter_damping=0.7");
-				WriteLine("o.beerengine_emitter_alpha_begin=0");
-				WriteLine("o.beerengine_emitter_alpha_end=0");
-				WriteLine("o.beerengine_emitter_size_min=1");
-				WriteLine("o.beerengine_emitter_size_max=1");
-				WriteLine("o.beerengine_emitter_size_inc=1");
-				WriteLine("o.beerengine_emitter_rot_inc=1");
-				WriteLine("o.beerengine_emitter_rot_min=0");
-				WriteLine("o.beerengine_emitter_rot_max=360");
+				WriteLine ("o.beerengine_emitter_alpha_fade_in=0.1");
+				WriteLine ("o.beerengine_emitter_alpha_fade_out=1");
+				WriteLine ("o.beerengine_emitter_alpha_value=0.5");
+				WriteLine ("o.beerengine_emitter_damping=0.7");
+				WriteLine ("o.beerengine_emitter_alpha_begin=0");
+				WriteLine ("o.beerengine_emitter_alpha_end=0");
+				WriteLine ("o.beerengine_emitter_size_min=1");
+				WriteLine ("o.beerengine_emitter_size_max=1");
+				WriteLine ("o.beerengine_emitter_size_inc=1");
+				WriteLine ("o.beerengine_emitter_rot_inc=1");
+				WriteLine ("o.beerengine_emitter_rot_min=0");
+				WriteLine ("o.beerengine_emitter_rot_max=360");
 
 				WriteLine ("o.beerengine_emitter_energy_min={0}", e.minEnergy);
 				WriteLine ("o.beerengine_emitter_energy_max={0}", e.maxEnergy);
@@ -453,7 +568,7 @@ public class BlenderExporter
 		// add default particle system
 		WriteLine ("o=O.new('ps',None)");
 		WriteLine ("o.empty_draw_type='SINGLE_ARROW'");
-		WriteLine ("o.beerengine_asset_type='9'");
+		WriteLine ("o.beerengine_asset_type=BE_PARTICLESYSTEM");
 		WriteLine ("o.beerengine_psys_count=65536");
 		WriteLine ("o.beerengine_psys_vs_shader='shaders/vs/particles.glsl'");
 		WriteLine ("o.beerengine_psys_fs_shader='shaders/fs/particles.glsl'");
