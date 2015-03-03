@@ -292,7 +292,7 @@ public class BlenderExporter
 	{
 		if (renderer.lightmapIndex < 254) {
 			WriteLine ("o.beerengine_lightmap_index={0}", renderer.lightmapIndex);
-			WriteLine ("o.beerengine_lightmap_address=[{0},{1},{2},{3}]", renderer.lightmapTilingOffset.x, renderer.lightmapTilingOffset.y, renderer.lightmapTilingOffset.z, renderer.lightmapTilingOffset.w);
+			WriteLine ("o.beerengine_lightmap_address=[{0},{1},{2},{3}]", renderer.lightmapScaleOffset.x, renderer.lightmapScaleOffset.y, renderer.lightmapScaleOffset.z, renderer.lightmapScaleOffset.w);
 		}
 		
 		if (materials.Contains (mat.ID ())) {
@@ -388,11 +388,11 @@ public class BlenderExporter
 
 			var name = "None";
 
-			if (trfm.light != null)
+			if (trfm.GetComponent<Light>() != null)
 				type = BeerEngine.SgAssetType.LIGHT;
-			if (trfm.particleEmitter != null)
+			if (trfm.GetComponent<ParticleEmitter>() != null)
 				type = BeerEngine.SgAssetType.EMITTER;
-			if (trfm.camera != null)
+			if (trfm.GetComponent<Camera>() != null)
 				type = BeerEngine.SgAssetType.CAMERA;
 
 			var mf = trfm.GetComponent<MeshFilter> ();
@@ -400,13 +400,13 @@ public class BlenderExporter
 			if (type == BeerEngine.SgAssetType.MAX) {
 				if (mf != null && mf.sharedMesh != null) {
 					Material mat = null;
-					if (trfm.renderer != null) {
-						mat = trfm.renderer.sharedMaterial;
+					if (trfm.GetComponent<Renderer>() != null) {
+						mat = trfm.GetComponent<Renderer>().sharedMaterial;
 					}
 				
 
 
-					ExportMesh (mf.mesh, mf.sharedMesh, mat, trfm.renderer);
+					ExportMesh (mf.mesh, mf.sharedMesh, mat, trfm.GetComponent<Renderer>());
 					type = BeerEngine.SgAssetType.GEOMETRY;
 					name = "me";
 					meshedobjects.Add (trfm.ID ());
@@ -414,16 +414,16 @@ public class BlenderExporter
 			}
 			
 			if (type == BeerEngine.SgAssetType.MAX) {
-				if (trfm.collider != null
-					&& trfm.audio == null
-					&& trfm.collider is BoxCollider
+				if (trfm.GetComponent<Collider>() != null
+					&& trfm.GetComponent<AudioSource>() == null
+					&& trfm.GetComponent<Collider>() is BoxCollider
 				    ) {
 					type = BeerEngine.SgAssetType.TRIGGERVOLUME;
 				}
 			}
 
 			if (type == BeerEngine.SgAssetType.LIGHT) {
-				ExportLight (trfm.light);
+				ExportLight (trfm.GetComponent<Light>());
 				name = "l";
 			}
 
@@ -445,8 +445,8 @@ public class BlenderExporter
 
 			if (type == BeerEngine.SgAssetType.TRIGGERVOLUME) {
 				WriteLine ("o.beerengine_asset_type=BE_TRIGGERVOLUME");
-				WriteLine ("o.beerengine_triggervolume_center=[{0},{1},{2}]", trfm.collider.bounds.center.x, trfm.collider.bounds.center.y, trfm.collider.bounds.center.z);
-				WriteLine ("o.beerengine_triggervolume_extents=[{0},{1},{2}]", trfm.collider.bounds.extents.x, trfm.collider.bounds.extents.y, trfm.collider.bounds.extents.z);
+				WriteLine ("o.beerengine_triggervolume_center=[{0},{1},{2}]", trfm.GetComponent<Collider>().bounds.center.x, trfm.GetComponent<Collider>().bounds.center.y, trfm.GetComponent<Collider>().bounds.center.z);
+				WriteLine ("o.beerengine_triggervolume_extents=[{0},{1},{2}]", trfm.GetComponent<Collider>().bounds.extents.x, trfm.GetComponent<Collider>().bounds.extents.y, trfm.GetComponent<Collider>().bounds.extents.z);
 				WriteLine ("o.show_name = True");
 				WriteLine ("o.draw_type = 'BOUNDS'");
 			}
@@ -474,15 +474,15 @@ public class BlenderExporter
 			WriteLine ("S.link(o)");
 			
 			if (type == BeerEngine.SgAssetType.GEOMETRY) {
-				if (trfm.renderer != null) {
-					var material = trfm.renderer.sharedMaterial;
+				if (trfm.GetComponent<Renderer>() != null) {
+					var material = trfm.GetComponent<Renderer>().sharedMaterial;
 					
 					//if (trfm.lightmapIndex!=255)
 					//{
 					//	//var to = trfm.renderer.lightmapTilingOffset
 					//}
 					
-					ExportMaterial (material, trfm.renderer);
+					ExportMaterial (material, trfm.GetComponent<Renderer>());
 					WriteLine ("if len(o.material_slots)<1:");
 					WriteLine ("\to.data.materials.append(ma)");
 					
@@ -491,7 +491,7 @@ public class BlenderExporter
 						WriteLine ("for f in me.uv_textures[0].data:");
 						WriteLine ("\tf.image=i");
 					}
-					if (trfm.renderer.lightmapIndex>-1 && trfm.renderer.lightmapIndex<LightmapSettings.lightmaps.Length) {
+					if (trfm.GetComponent<Renderer>().lightmapIndex>-1 && trfm.GetComponent<Renderer>().lightmapIndex<LightmapSettings.lightmaps.Length) {
 						WriteLine ("i=tslm.texture.image");
 						WriteLine ("for f in me.uv_textures[len(me.uv_textures)-1].data:");
 						WriteLine ("\tf.image=i");
@@ -510,13 +510,13 @@ public class BlenderExporter
 			}
 			
 			if (type == BeerEngine.SgAssetType.EMITTER) {
-				var e = trfm.particleEmitter;
+				var e = trfm.GetComponent<ParticleEmitter>();
 //#if BEERENGINE
 				WriteLine ("o.beerengine_asset_type=BE_EMITTER");
 				WriteLine ("o.beerengine_emitter_one_shot=False");
 
 
-				var path = UnityEditor.AssetDatabase.GetAssetOrScenePath (e.renderer.sharedMaterial.mainTexture);
+				var path = UnityEditor.AssetDatabase.GetAssetOrScenePath (e.GetComponent<Renderer>().sharedMaterial.mainTexture);
 
 				WriteLine ("o.beerengine_emitter_texture='{0}'", path);
 				WriteLine ("o.beerengine_emitter_particlesystem='ps'");
